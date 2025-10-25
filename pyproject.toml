@@ -1,0 +1,19 @@
+[project]
+name = "yalp"
+version = "0.1.0"
+description = "Yet Another LLM Proxy"
+authors = [{name = "Your Name", email = "you@example.com"}]
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "uv>=0.4.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+yalp = "yalp.__main__:main"

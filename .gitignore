@@ -1,0 +1,16 @@
+# Python byte‑code
+__pycache__/
+*.py[cod]
+
+# Local virtual environment (created by uv sync)
+.venv/
+
+# UV workspace/cache directories
+.uv/
+__pypackages__/
+
+# FastAPI / uvicorn generated files (none by default, but ignore logs if any)
+*.log
+
+# setuptools / pip generated metadata
+*.egg-info/
