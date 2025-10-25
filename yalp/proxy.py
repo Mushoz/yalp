@@ -9,16 +9,23 @@ using an :class:`httpx.AsyncClient`. The response from the upstream is then
 returned to the original client preserving status code, headers, and body.
 """
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
 import httpx
+from starlette.background import BackgroundTask
 
 from .config import get_upstream_base
 
 app = FastAPI(title="YALP Proxy")
 
-# A single shared client for all requests – it will be closed automatically
-# when the FastAPI lifespan ends (uvicorn will handle the event loop).
-client = httpx.AsyncClient()
+# A single shared client for all requests – closed via the shutdown hook.
+client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=None))
+
+
+@app.on_event("shutdown")
+async def shutdown_client():
+    """Ensure the shared HTTP client is closed when the app stops."""
+    await client.aclose()
 
 
 def _strip_host_header(headers: dict) -> dict:
@@ -48,15 +55,24 @@ async def proxy(full_path: str, request: Request):
     # Prepare headers, stripping the Host header
     headers = _strip_host_header(dict(request.headers))
 
-    # Forward the request
-    resp = await client.request(
+    # Forward the request (streaming response)
+    req = client.build_request(
         method=request.method,
         url=upstream_url,
         headers=headers,
         content=body,
-        timeout=30.0,
     )
+    resp = await client.send(req, stream=True)
 
     # Build FastAPI response preserving status, headers, and body
-    return Response(content=resp.content, status_code=resp.status_code, headers=dict(resp.headers))
+    async def stream_body():
+        async for chunk in resp.aiter_raw():
+            yield chunk
 
+    background = BackgroundTask(resp.aclose)
+    return StreamingResponse(
+        stream_body(),
+        status_code=resp.status_code,
+        headers=dict(resp.headers),
+        background=background,
+    )
