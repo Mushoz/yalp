@@ -15,6 +15,8 @@ import httpx
 from starlette.background import BackgroundTask
 
 from .config import get_upstream_base
+import json
+import io
 
 app = FastAPI(title="YALP Proxy")
 
@@ -64,15 +66,8 @@ async def proxy(full_path: str, request: Request):
     )
     resp = await client.send(req, stream=True)
 
-    # Build FastAPI response preserving status, headers, and body
-    async def stream_body():
-        async for chunk in resp.aiter_raw():
-            yield chunk
+    # Delegate response processing to the ReasoningRenamer module
+    from .modules.reasoning_renamer import ReasoningRenamer
 
-    background = BackgroundTask(resp.aclose)
-    return StreamingResponse(
-        stream_body(),
-        status_code=resp.status_code,
-        headers=dict(resp.headers),
-        background=background,
-    )
+    renamer = ReasoningRenamer()
+    return await renamer(resp)
